@@ -13,7 +13,7 @@ class Firm():
         self.fcost = config["fcost"]
         self.good = good
         
-        self.supply_offers = [(p/2, q) for p in range(1, 20) for q in range(10, 100, 10)]
+        self.supply_offers = [(1.2**p, 2**q) for p in range(1, 10) for q in range(6,11)]
         if config["learning"] == "vre":
             self.vre_recency = 0.9
             self.vre_explore = 0.5
@@ -84,8 +84,8 @@ class Consumer():
         self.ID = ID
         self.endowment = config["av_endowment"]
         self.income = self.endowment
-        self.hash_need = config["hash_need"]
-        self.bean_need = config["bean_need"]
+        self.hash_need = config["hash_need"] * random.uniform(0.2,5)
+        self.bean_need = config["bean_need"] * random.uniform(0.2, 5)
 
         self.hash_value = config["hash_value"]
         self.bean_value = config["bean_value"]
@@ -166,8 +166,8 @@ def selling_round(next_person, bean_low_firm, hash_low_firm, hd, bd):
          bean_low_firm.supply > next_person.net_bean:
         next_person.hash += hash_low_firm.supply 
         next_person.bean += bean_low_firm.supply
-        hash_low_firm.supply - next_person.net_hash
-        bean_low_firm.supply - next_person.net_bean
+        hash_low_firm.supply -= next_person.net_hash
+        bean_low_firm.supply -= next_person.net_bean
         person_out = True
 
     elif hash_low_firm.supply > next_person.net_hash and \
@@ -222,20 +222,11 @@ def main(config):
 
         hash_sell_list = sorted(hash_firm_list, key=lambda x: x.price)
         bean_sell_list = sorted(bean_firm_list, key=lambda x: x.price)
-        
-        hash_low_firm = hash_sell_list.pop(0)
-        hash_low_price = hash_low_firm.price
 
-        bean_low_firm = bean_sell_list.pop(0)
-        bean_low_price = bean_low_firm.price
-    
-        next_person = buyers.pop(0)
-        hd, bd = next_person.get_demands(hash_low_price, bean_low_price)
+        bs, hs, cd = True, True, True
+
 
         while (hash_sell_list or bean_sell_list) and buyers:
-            bs, hs, cd = selling_round(next_person, bean_low_firm, hash_low_firm, hd, bd)
-            # print("sale made", bs, hs, cd, step, len(hash_sell_list), len(bean_sell_list), len(buyers))
-            # print(hash_low_firm, hash_low_price)
             if hs and hash_sell_list:
                 hash_low_firm = hash_sell_list.pop(0)
                 hash_low_price = hash_low_firm.price
@@ -244,17 +235,21 @@ def main(config):
                 bean_low_firm = bean_sell_list.pop(0)
                 bean_low_price = bean_low_firm.price
 
+            # for firm in hash_sell_list:
+                # print(firm.price, firm.supply)
             if not hash_sell_list:
                 hash_low_price = 0
             if not bean_sell_list:
                 bean_low_price = 0
-            
+            if not hash_sell_list and bean_sell_list:
+                break
             # print(bean_low_firm.supply)
 
             if cd:
                 next_person = buyers.pop(0)
-            
+
             hd, bd = next_person.get_demands(hash_low_price, bean_low_price)
+
             # logging.info(f'Hash demand: {hd}, Bean demand: {bd}, Hash price: {hash_low_price}, Bean price: {bean_low_price}')
 
             while hd == "dead" and buyers:
@@ -262,6 +257,11 @@ def main(config):
                 next_person = buyers.pop(0)
                 people.remove(next_person)
                 hd, bd = next_person.get_demands(hash_low_price, bean_low_price)
+                print(hash_low_price, bean_low_price, hd, bd)
+
+            if hd == "dead":
+                break
+            bs, hs, cd = selling_round(next_person, bean_low_firm, hash_low_firm, hd, bd)
         
         for person in people:
             person.begin_step()
