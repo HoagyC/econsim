@@ -1,0 +1,17 @@
+{
+  "prod_cap": 100,
+  "init_money": 2000,
+  "fcost_upkeep": 50,
+  "fcost": 100,
+  "quad_mcost": 2,
+  "nh": 20,
+  "nb": 20,
+  "np": 300,
+  "learning": "vre",
+  "av_endowment": 30,
+  "hash_need": 4.5,
+  "bean_need": 4.5,
+  "bean_value": 0.7,
+  "hash_value": 0.7,
+  "total_steps": 1000
+}
