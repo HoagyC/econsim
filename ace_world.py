@@ -2,34 +2,48 @@ import logging
 import random
 import json
 import math
+import matplotlib.pyplot as plt
 
-logging.basicConfig(level=logging.INFO)
+from tqdm.auto import tqdm
+
+logging.basicConfig(level=logging.ERROR)
 
 
 class Firm:
     def __init__(self, good, config, ID):
         self.ID = ID
-        self.prod_cap = config["prod_cap"]
-        self.money = config["init_money"]
-        self.fcost_upkeep = config["fcost_upkeep"]
-        self.fcost = config["fcost"]
-        self.mcost = config["mcost"]
-        self.quad_mcost = config["quad_mcost"]
-        self.cap_cost = config["cap_cost"]
+        self.good = good
+        if self.good == "bean":
+            self.prod_cap = config["b_prod_cap"]
+            self.money = config["b_init_money"]
+            self.fcost_upkeep = config["b_fcost_upkeep"]
+            self.fcost = config["b_fcost"]
+            self.mcost = config["b_mcost"]
+            self.quad_mcost = config["b_quad_mcost"]
+            self.cap_cost = config["b_cap_cost"]
+        elif self.good == "hash":
+            self.prod_cap = config["h_prod_cap"]
+            self.money = config["h_init_money"]
+            self.fcost_upkeep = config["h_fcost_upkeep"]
+            self.fcost = config["h_fcost"]
+            self.mcost = config["h_mcost"]
+            self.quad_mcost = config["h_quad_mcost"]
+            self.cap_cost = config["h_cap_cost"]
+
         self.div_level = config["div_level"]
         self.inv_level = random.random()
-        self.good = good
+        self.solvent = True
 
         self.supply_offers = [
-            (p/10, q/10) for p in range(2, 11) for q in range(0, 10)
+            (p / 10, q / 10) for p in range(2, 11) for q in range(0, 10)
         ]
         self.num_options = len(self.supply_offers)
         self.profit = 0
 
         if config["learning"] == "vre":
-            self.vre_recency = 0.1
-            self.vre_explore = 0.5
-            self.vre_cool = 100
+            self.vre_recency = config["vre_recency"]
+            self.vre_explore = config["vre_explore"]
+            self.vre_cool = config["vre_cool"]
             self.qs = [0] * self.num_options
 
     def begin_step(self):
@@ -53,7 +67,6 @@ class Firm:
 
     def allocate_profit(self):
         if self.profit >= 0 and self.prod_level == self.prod_cap:
-            print("profit check", profit, self.prod_cap, self.inv_level, self.cap_cost)
             self.prod_cap += ((1 - self.inv_level) * self.profit) / self.cap_cost
             self.dividend = self.div_level * (self.money + self.inv_level * self.profit)
             self.money += self.inv_level * self.profit - self.dividend
@@ -63,7 +76,7 @@ class Firm:
 
         else:
             ind = 1 if (self.money + self.profit >= 1) else 0
-            prod_cap_change= (1 - ind) * (self.money + self.profit) / self.cap_cost
+            prod_cap_change = (1 - ind) * (self.money + self.profit) / self.cap_cost
             if prod_cap_change > -self.prod_cap:
                 prod_cap = 0
             self.money = ind * (self.money + self.profit)
@@ -84,8 +97,10 @@ class Firm:
         denom = sum(exp_qs)
         ps = [exp_qs[i] / denom for i in range(self.num_options)]
         self.chosen_id = random.choices(list(range(self.num_options)), weights=ps)[0]
-        self.price = (self.supply_offers[self.chosen_id][0]+1) * self.mcost
-        self.supply = self.supply_offers[self.chosen_id][1] * self.prod_cap
+        self.markup = self.supply_offers[self.chosen_id][0]
+        self.prod_percent = self.supply_offers[self.chosen_id][1]
+        self.price = (self.markup + 1) * self.mcost
+        self.supply = self.prod_percent * self.prod_cap
 
     def update_rl(self):
         for i in range(self.num_options):
@@ -99,8 +114,6 @@ class Firm:
                 self.qs[i] = self.qs[i] * (1 - self.vre_recency) + (
                     self.vre_explore * self.qs[i]
                 ) / (self.num_options - 1)
-        if (self.ID == 1):
-            print(self.qs[10], self.chosen_id)
 
     def vre_init(supply_offers):
         self.ps = [1] * len(self.supply_offers)
@@ -121,6 +134,7 @@ class Consumer:
         self.ID = ID
         self.endowment = config["av_endowment"]
         self.income = self.endowment
+        self.alive = True
         self.hash_need = config["hash_need"] * random.uniform(0.2, 5)
         self.bean_need = config["bean_need"] * random.uniform(0.2, 5)
 
@@ -244,15 +258,54 @@ def setup(config):
     people = [Consumer(config, i) for i in range(config["np"])]
     print("People generated.")
     hash_firm_list = [Firm("hash", config, i) for i in range(config["nh"])]
-    bean_firm_list = [Firm("bean", config, i+config["nh"]) for i in range(config["nb"])]
+    bean_firm_list = [
+        Firm("bean", config, i + config["nh"]) for i in range(config["nb"])
+    ]
     print("Firms generated")
     return hash_firm_list, bean_firm_list, people
 
 
+class Callback:
+    def __init__(self, log_dir):
+        self.log_dir = log_dir
+        self.pbar = None
+        self.h_markup_list = []
+        self.b_markup_list = []
+        self.h_price_list = []
+        self.b_price_list = []
+
+    def __call__(self, _locals, _globals):
+        if not self.pbar:
+            self.pbar = tqdm(total=_locals["ts"])
+
+        self.pbar.set_postfix_str("{step}/{ts} updates".format(**_locals))
+        self.pbar.update()
+        h_markups = [f.markup for f in _locals["hash_firm_list"]]
+        b_markups = [f.markup for f in _locals["bean_firm_list"]]
+        self.h_markup_list.append(sum(h_markups) / len(h_markups))
+        self.b_markup_list.append(sum(b_markups) / len(b_markups))
+
+        h_prices = [f.price for f in _locals["hash_firm_list"]]
+        b_prices = [f.price for f in _locals["bean_firm_list"]]
+        self.h_price_list.append(sum(h_prices) / len(h_prices))
+        self.b_price_list.append(sum(b_prices) / len(b_prices))
+
+    def make_graphs(self):
+        x = list(range(1, len(self.h_markup_list) + 1))
+        plt.plot(x, self.b_markup_list, "r")
+        plt.plot(x, self.h_markup_list, "b")
+        plt.plot(x, self.b_price_list, "r:")
+        plt.plot(x, self.h_price_list, "b:")
+        plt.show()
+
+
 def main(config):
+    cb = Callback("big log")
     print("Starting Setup")
     hash_firm_list, bean_firm_list, people = setup(config)
-    for step in range(config["total_steps"]):
+    data = {}
+    ts = config["total_steps"]
+    for step in range(ts):
         buyers = people[:]
         random.shuffle(buyers)
         random.shuffle(hash_firm_list)
@@ -299,7 +352,6 @@ def main(config):
                 people.remove(next_person)
                 next_person = buyers.pop(0)
                 hd, bd = next_person.get_demands(hash_low_price, bean_low_price)
-                print(hash_low_price, bean_low_price, hd, bd)
 
             if hd == "dead":
                 break
@@ -307,6 +359,7 @@ def main(config):
                 next_person, bean_low_firm, hash_low_firm, hd, bd
             )
 
+        cb(locals(), globals())
         for person in people:
             person.begin_step()
         for firm in hash_firm_list + bean_firm_list:
@@ -314,8 +367,7 @@ def main(config):
             firm.get_costs()
             firm.allocate_profit()
 
-    print(len(hash_firm_list), len(bean_firm_list))
-    print("hash qs", hash_firm_list[0].qs)
+    cb.make_graphs()
 
 
 if __name__ == "__main__":

@@ -1,20 +1,37 @@
 {
-  "prod_cap": 1000,
-  "init_money": 2000,
-  "fcost_upkeep": 0,
-  "fcost": 0.2,
-  "quad_mcost": 0,
-  "mcost": 1,
-  "cap_cost": 30,
-  "div_level": 0.7,
-  "nh": 50,
-  "nb": 50,
+  "total_steps": 1000,
+
+  "nh": 20,
+  "nb": 20,
   "np": 300,
-  "learning": "vre",
+
   "av_endowment": 200,
   "hash_need": 10,
   "bean_need": 10,
-  "bean_value": 0.7,
-  "hash_value": 0.7,
-  "total_steps": 1000
+  "bean_value": 0.9,
+  "hash_value": 0.9,
+
+  "b_prod_cap": 1000,
+  "b_init_money": 2000,
+  "b_fcost_upkeep": 0,
+  "b_fcost": 0.2,
+  "b_quad_mcost": 0,
+  "b_mcost": 1,
+  "b_cap_cost": 30,
+
+  "h_prod_cap": 1000,
+  "h_init_money": 2000,
+  "h_fcost_upkeep": 0,
+  "h_fcost": 0.2,
+  "h_quad_mcost": 0,
+  "h_mcost": 2,
+  "h_cap_cost": 30,
+
+  "div_level": 0.7,
+
+  "learning": "vre",
+
+  "vre_recency": 0.1,
+  "vre_explore": 0.5,
+  "vre_cool": 100
 }
